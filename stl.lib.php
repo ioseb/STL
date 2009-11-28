@@ -645,13 +645,13 @@ class STL_Context {
     }
     return null;
   }
-  
+
   private static function getVar($context, $var, $index = null) {
     
-    if (is_array($context) && isset($context[$var])) {
-      
+    if (is_array($context) && array_key_exists($var, $context)) {
+
       $context = $context[$var];
-      if (is_numeric($index) && isset($context[$index])) {
+      if (is_numeric($index) && array_key_exists($index, $context)) {
         $context = $context[$index];
       }
       
@@ -772,8 +772,11 @@ class STL_Context {
         }
       }
       
-      if (!$result && $gc) {
+      if ($gc) {
+        if (is_null($result)) {
          return STL_GlobalContext::lookup($var);
+        }
+        return $result;
       }
       
       return $result;
