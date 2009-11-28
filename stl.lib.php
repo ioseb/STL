@@ -410,6 +410,10 @@ class STL_Condition {
     return $v1 < $v2;
   }
   
+  private static function if_in($v1, $v2) {
+    return is_array($v2) && in_array($v1, $v2);
+  }
+  
   private static function is_and($v) {
     return $v == 'and' || $v == '&&';
   }
@@ -422,7 +426,7 @@ class STL_Condition {
   
     if (is_numeric($value)) {
       return (float) $value;
-    } else if (preg_match('/^(null|false|true)$/i', $value, $matches)) {
+    } else if (is_string($value) && preg_match('/^(null|false|true)$/i', $value, $matches)) {
       $values = array(
         'null'  => null,
         'false' => false,
@@ -447,9 +451,9 @@ class STL_Condition {
     if (is_array($condition['var'])) {
 
       foreach($condition['var'] as $id => $var) {
-        
+
         $var = $context->lookup($var);
-        $eq  = self::$methods[$condition['eq'][$id]];
+        $eq  = $condition['eq'][$id];
         $val = self::value($condition['value'][$id]);
         
         if ($eq == 'in') {
@@ -457,7 +461,7 @@ class STL_Condition {
         }
         
         $tmp = call_user_func(
-          $eq,
+          self::$methods[$eq],
           self::value($var),
           self::value($val)
         );
