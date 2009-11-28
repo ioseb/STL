@@ -43,6 +43,9 @@ class STL_EvaluatorTest extends PHPUnit_Framework_TestCase {
     $context->put('var7', 4.8);
     $context->put('var8', 11);
     
+    $context->put('test', 'a');
+    $context->put('arr', array('b', 'c', 'a'));
+    
     return array(
       array(
         $context,
@@ -103,6 +106,11 @@ class STL_EvaluatorTest extends PHPUnit_Framework_TestCase {
         $context,
         ('test value' == 'test value') && ('test value' != 'test value') || ('hello' == 'yes') || ('hello' == 'hello'),
         'var1=="test value" and var2!="test value" or var3=="yes" or var3=="hello"'
+      ),
+      array(
+        $context,
+        in_array('a', array('b', 'c', 'a')),
+        'test && test in arr'
       )
     );
     

@@ -190,7 +190,7 @@ class STL_ParseCondition {
         }
         
       }
-      
+
       return $structure;
       
     }

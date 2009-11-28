@@ -63,35 +63,35 @@ class STL_ParseConditionTest extends PHPUnit_Framework_TestCase {
       ),
       array(
         array (
-          'var' => array (
-            0 => 'test',
-            1 => 'test1',
-            2 => 'test2',
-            3 => 'test3',
-            4 => 't',
-          ),
-          'eq' => array (
-            0 => '!',
-            1 => '==',
-            2 => NULL,
-            3 => NULL,
-            4 => 'in',
-          ),
-          'value' => array (
-            0 => '',
-            1 => 't',
-            2 => '',
-            3 => '',
-            4 => 'hello.world',
-          ),
-          'oper' => array (
-            0 => '||',
-            1 => '&&',
-            2 => 'and',
-            3 => 'or',
-            4 => NULL,
-          ),
+        'var' => array (
+          0 => 'test',
+          1 => 'test1',
+          2 => 'test2',
+          3 => 'test3',
+          4 => 't',
         ),
+        'eq' => array (
+          0 => '!',
+          1 => '==',
+          2 => '==',
+          3 => '==',
+          4 => 'in',
+        ),
+        'value' => array (
+          0 => '',
+          1 => 't',
+          2 => 'true',
+          3 => 'true',
+          4 => 'hello.world',
+        ),
+        'oper' => array (
+          0 => '||',
+          1 => '&&',
+          2 => 'and',
+          3 => 'or',
+          4 => NULL,
+        ),
+      ),
         '!test || test1=="t" && test2 and test3 or t in hello.world'
       ),
       array(
