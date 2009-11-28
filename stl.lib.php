@@ -143,14 +143,18 @@ class STL_ParseCondition {
   
     $var = array_shift($token);
     $eq  = array_shift($token);
+    $val = trim(array_shift($token), '"\'');
     
     if ($var{0} == '!') {
       $var = substr($var, 1);
       $eq = '!';
+    } else if (!$eq && !$val) {
+      $eq = '==';
+      $val = 'true';
     }
     
     $structure['eq'][]    = $eq;
-    $structure['value'][] = trim(array_shift($token), '"\'');
+    $structure['value'][] = $val;
     $structure['oper'][]  = $operator;
     $structure['var'][]   = $var;
     
@@ -387,7 +391,7 @@ class STL_Condition {
   }
   
   private static function if_not($v) {
-    return !!$v;
+    return $v ? !!$v : !$v;
   }
   
   private static function if_and($v1, $v2) {
@@ -441,15 +445,21 @@ class STL_Condition {
     $cond = null;
     
     if (is_array($condition['var'])) {
-    
+
       foreach($condition['var'] as $id => $var) {
         
         $var = $context->lookup($var);
+        $eq  = self::$methods[$condition['eq'][$id]];
+        $val = self::value($condition['value'][$id]);
+        
+        if ($eq == 'in') {
+          $val = $context->lookup($val);
+        }
         
         $tmp = call_user_func(
-          self::$methods[$condition['eq'][$id]],
+          $eq,
           self::value($var),
-          self::value($condition['value'][$id])
+          self::value($val)
         );
 
         if ($tmp == true && self::is_and($condition['oper'][$id])) {
