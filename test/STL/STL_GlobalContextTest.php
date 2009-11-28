@@ -6,6 +6,30 @@ require_once dirname(__FILE__) . '/../../stl.lib.php';
 class STL_GlobalContextTest extends PHPUnit_Framework_TestCase {
   
   /**
+   * @dataProvider emptyValuesProvider
+   */
+  public function testEmptyValues($context, $expected, $var) {
+    $this->assertEquals($expected, $context->lookup($var));
+  }
+  
+  public static function emptyValuesProvider() {
+    
+    $context = new STL_Context();
+    $context->put('zero_value', 0);
+    $context->put('null_value', null);
+    $context->put('false_value', false);
+    $context->put('empty_string_value', '');
+    
+    return array(
+      array($context, 0, 'zero_value'),
+      array($context, null, 'null_value'),
+      array($context, false, 'false_value'),
+      array($context, '', 'empty_string_value')
+    );
+    
+  }
+  
+  /**
    * @dataProvider lookupProvider
    */
   public function testLookup($value, $context, $param) {

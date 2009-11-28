@@ -249,6 +249,49 @@ class STL_ParseForEach {
   
 }
 
+class STL_ParseWhile {
+
+  private static $regexs = array(
+    
+    'while' => '~
+      {while(.*?)}                    # match outmost opening tag at least with one attribute
+      (
+        (?:                           # do not capture this match
+          (?!{/?while).               # use negative lookahead to ensure that text does not contain same nested tag 
+          |                           # OR
+          (?R)                        # use recursion to handle nested tag
+        )++
+      )
+      {/while}                        # match outmost closing tag
+     ~six
+    '
+    
+  );
+  
+  public static function parse($input) {
+    
+    $cond = null;
+    
+    if (is_array($input)) {
+      $cond = trim($input[1]);
+      $input = $input[2];
+    }
+    
+    $block = array(
+      'cond' => STL_ParseCondition::parse($cond),
+      'body' => trim(preg_replace_callback(self::$regexs['while'], array('self', 'parse'), $input))
+    );
+    
+    if (!empty($block['cond'])) {
+      return '#_while_'. STL_CodeBlocks::add('while', $block);
+    }
+    
+    return $block['body'];
+    
+  }
+  
+}
+
 class STL_ParseIF {
 
   private static $regexs = array(
