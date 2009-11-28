@@ -127,35 +127,72 @@ class STL_ParseModule {
 }
 
 class STL_ParseCondition {
-  
-  private static $regexs = array(
 
-    'condition' => '~
-      (?P<var>.+?)                    # capture variable name
-      \s*                             # any number of white spaces
-      (?P<eq>==|!=|>|<)               # capture equation type
-      \s*                             # any number of white spaces
-      "(?P<value>.+?)"                # capture value
-      (?:                             # do not capture this match
-        \s+                           # at least one white space
-        (?P<oper>and|or|&&|\|\|)      # capture condition type
-        \s+                           # at least one white space
-      )?                              # make match optional
-     ~six
-    '
-     
-  );
+  private static function get_array() {
+    return array(
+      'var'   => array(),
+      'eq'    => array(),
+      'value' => array(),
+      'oper'  => array(),
+    );
+  }
+  
+  private static function add_var(&$structure, $token, $operator) {
+  
+    $token = array_map('trim', $token);
+  
+    $var = array_shift($token);
+    $eq  = array_shift($token);
+    
+    if ($var{0} == '!') {
+      $var = substr($var, 1);
+      $eq = '!';
+    }
+    
+    $structure['eq'][]    = $eq;
+    $structure['value'][] = trim(array_shift($token), '"\'');
+    $structure['oper'][]  = $operator;
+    $structure['var'][]   = $var;
+    
+  }
   
   public static function parse($input) {
-    if (preg_match_all(self::$regexs['condition'], $input, $matches)) {
-      foreach ($matches as $k => $v) {
-        if (is_numeric($k)) {
-          unset($matches[$k]);
+    
+    $logical    = '~\s+(?P<oper>and|or|&&|\|\|)\s+~';
+    $comparison = '~(==|!=|>|<|\s+in\s+)~';
+    
+    $tokens = preg_split($logical, $input, 0, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+    
+    if (!empty($tokens)) {
+    
+      $structure = self::get_array();
+    
+      if (sizeof($tokens) == 1) {
+        self::add_var(
+          $structure,
+          preg_split($comparison, array_shift($tokens), 0, PREG_SPLIT_DELIM_CAPTURE),
+          null
+        );
+      } else {
+      
+        $tokens = array_chunk($tokens, 2);
+        
+        foreach($tokens as $token) {
+          self::add_var(
+            $structure, 
+            preg_split($comparison, array_shift($token), 0, PREG_SPLIT_DELIM_CAPTURE), 
+            array_shift($token)
+          );
         }
+        
       }
-      return $matches;
+      
+      return $structure;
+      
     }
+  
     return null;
+    
   }
   
 }
@@ -331,12 +368,14 @@ class STL_Condition {
   private static $methods = array(
     '=='  => array('self', 'if_eq'),
     '!='  => array('self', 'if_neq'),
+    '!'   => array('self', 'if_not'),
     'and' => array('self', 'if_and'),
     '&&'  => array('self', 'if_and'),
     'or'  => array('self', 'if_or'),
     '||'  => array('self', 'if_or'),
     '>'   => array('self', 'if_gt'),
     '<'   => array('self', 'if_lt'),
+    'in'  => array('self', 'if_in')
   );
   
   private static function if_eq($v1, $v2) {
@@ -345,6 +384,10 @@ class STL_Condition {
   
   private static function if_neq($v1, $v2) {
     return $v1 != $v2;
+  }
+  
+  private static function if_not($v) {
+    return !!$v;
   }
   
   private static function if_and($v1, $v2) {
@@ -361,6 +404,14 @@ class STL_Condition {
   
   private static function if_lt($v1, $v2) {
     return $v1 < $v2;
+  }
+  
+  private static function is_and($v) {
+    return $v == 'and' || $v == '&&';
+  }
+  
+  private static function is_or($v) {
+    return $v == 'or' || $v == '||';
   }
   
   private static function value($value) {
@@ -401,11 +452,11 @@ class STL_Condition {
           self::value($condition['value'][$id])
         );
 
-        if ($tmp == true && $condition['oper'][$id] == 'and') {
+        if ($tmp == true && self::is_and($condition['oper'][$id])) {
           
-        } else if ($tmp == false && $condition['oper'][$id] == 'or') {
+        } else if ($tmp == false && self::is_or($condition['oper'][$id])) {
           
-        } else if ($tmp == true && $condition['oper'][$id] == 'or') {
+        } else if ($tmp == true && self::is_or($condition['oper'][$id])) {
           $result = true;
           break;
         } else if (!$condition['oper'][$id]) {
@@ -415,9 +466,9 @@ class STL_Condition {
           break;
         }
         
-        if ($cond == 'and') {
+        if (self::is_and($cond)) {
           $result &= $tmp;
-        } else if ($cond == 'or') {
+        } else if (self::is_or($cond)) {
           $result |= $tmp;
         } else {
           $result = $tmp;
@@ -429,7 +480,7 @@ class STL_Condition {
       
     }
     
-    return $result;
+    return !!$result;
     
   }
   
