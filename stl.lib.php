@@ -699,12 +699,12 @@ class STL_Context {
     
     $regex = '~
       (?:
-        (?<var>\w+)                   # match variable name
+        (?P<var>\w+)                  # match variable name
         \s*                           # any number of white spaces
         (?:                           # do not capture this match
           \[                          # match opening square bracket
             \s*                       # any number of white spaces
-            (?<index>\d+)             # match and capture numeric index of array
+            (?P<index>\d+)            # match and capture numeric index of array
             \s*                       # any number of white spaces
           \]                          # match closing square bracket
         )?                            # make this match optionsl
