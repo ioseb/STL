@@ -79,6 +79,10 @@ class STL_ParseModule {
     
   );
   
+  private static function has_iterator($input) {
+    return strpos($input, 'mod:iterator') !== false;
+  }
+  
   private static function parse_iterator($input) {
     
     $block = array();
@@ -113,14 +117,20 @@ class STL_ParseModule {
       $input = $input[4];
     }
     
-    $block['body'] = preg_replace_callback(self::$regexs['mod'], array('self', 'parse'), $input);
-    $block['body'] = self::parse_iterator($block['body']);
+    $input = trim($input);
     
-    if (!empty($block['name'])) {
-      return '#_mod_'. STL_CodeBlocks::add('mod', $block);
+    if ($input) {
+      $block['body'] = preg_replace_callback(self::$regexs['mod'], array('self', 'parse'), $input);
+      $block['body'] = self::parse_iterator($block['body']);
+      
+      if (!empty($block['name'])) {
+        return '#_mod_'. STL_CodeBlocks::add('mod', $block);
+      }
+      
+      return $block['body'];
     }
     
-    return $block['body'];
+    return null;
     
   }
   
@@ -249,49 +259,6 @@ class STL_ParseForEach {
   
 }
 
-class STL_ParseWhile {
-
-  private static $regexs = array(
-    
-    'while' => '~
-      {while(.*?)}                    # match outmost opening tag at least with one attribute
-      (
-        (?:                           # do not capture this match
-          (?!{/?while).               # use negative lookahead to ensure that text does not contain same nested tag 
-          |                           # OR
-          (?R)                        # use recursion to handle nested tag
-        )++
-      )
-      {/while}                        # match outmost closing tag
-     ~six
-    '
-    
-  );
-  
-  public static function parse($input) {
-    
-    $cond = null;
-    
-    if (is_array($input)) {
-      $cond = trim($input[1]);
-      $input = $input[2];
-    }
-    
-    $block = array(
-      'cond' => STL_ParseCondition::parse($cond),
-      'body' => trim(preg_replace_callback(self::$regexs['while'], array('self', 'parse'), $input))
-    );
-    
-    if (!empty($block['cond'])) {
-      return '#_while_'. STL_CodeBlocks::add('while', $block);
-    }
-    
-    return $block['body'];
-    
-  }
-  
-}
-
 class STL_ParseIF {
 
   private static $regexs = array(
@@ -359,7 +326,7 @@ class STL_ParseIF {
     );
     
     self::parse_else($block);
-    $block['body'] = STL_ParseForEach::parse($block['body']);
+    $block['body'] = STL_ParseModule::parse(STL_ParseForEach::parse($block['body']));
         
     return '#_if_'. STL_CodeBlocks::add('if', $block);
     
@@ -423,15 +390,16 @@ class STL_Condition {
   }
   
   private static function value($value) {
-  
+    
+    $values = array(
+      'null'  => null,
+      'false' => false,
+      'true'  => true
+    );
+    
     if (is_numeric($value)) {
       return (float) $value;
-    } else if (is_string($value) && preg_match('/^(null|false|true)$/i', $value, $matches)) {
-      $values = array(
-        'null'  => null,
-        'false' => false,
-        'true'  => true
-      );
+    } else if (is_string($value) && array_key_exists(strtolower($value), $values)) {
       return $values[strtolower($value)];
     }
     
@@ -444,7 +412,6 @@ class STL_Condition {
   }
   
   public static function evaluate($condition, $context) {
-  
     $result = false;
     $cond = null;
     
@@ -495,7 +462,6 @@ class STL_Condition {
     }
     
     return !!$result;
-    
   }
   
 }
@@ -562,7 +528,6 @@ class STL_ParseFunction {
     if (is_array($input)) {
 
       $input = $input[1];
-            
       while(preg_match_all(self::$regex['fn'], $input, $matches)) {
         $input = str_replace($matches[0], self::exec($matches['fn'][0], $matches['args'][0]), $input);    
       }
@@ -808,33 +773,48 @@ class STL_Context {
 class STL_Evaluator {
   
   private $context;
+  private $include_path = array();
   
   public function __construct($context) {
     $this->context = $context;
   }
+  
+  private function eval_mod($block) {
+    pre($block);
+  }
 
   private function eval_for($block) {
+  
     $array   = $this->context->lookup($block['array']);
+    
     if (is_array($array)) {
+    
       $result  = array();
+      $context = new STL_Context($this->context);
+      
       foreach ($array as $k => $v) {
-        $context = new STL_Context($this->context);
+        
+        $context->put('key', $k);
         $context->put($block['var'], $v);
         $parser = new STL_Evaluator($context);
+        
         $result[] = $parser->parse(array(
           'body' => STL_ParseFunction::parse(
             STL_ParseVar::parse($block['body'], $context)
           )
         ));
+        
       }
+      
     }
+    
     return implode('', $result);
+    
   }
   
-  private function eval_if($block) {
-    
+  private function eval_if($block) {    
     $result = null;
-  
+
     if ($block['cond'] && STL_Condition::evaluate($block['cond'], $this->context)) {
       $result = $this->parse($block);
     } else if (!empty($block['else'])) {
@@ -848,16 +828,17 @@ class STL_Evaluator {
     } else if (empty($block['cond'])) {
       $result = $this->parse($block);
     }
+    
     if ($result) {
       $result = STL_ParseFunction::parse(
         STL_ParseVar::parse($result, $this->context)
       );
     }
+    
     return $result;
   }
     
   private function parse_callback($input) {
-
     $result = null;
     
     if (is_array($input) && ($block = STL_CodeBlocks::get($input[1], $input[2]))) {
@@ -866,9 +847,8 @@ class STL_Evaluator {
         $result = call_user_func($callback, $block);
       }
     }
-    
-    return $result;
-    
+
+    return $result; 
   }
   
   private function parse($block) {
@@ -881,7 +861,6 @@ class STL_Evaluator {
   }
   
   public function evaluate() {
-    
     $blocks = &STL_CodeBlocks::get_blocks();
 
     return STL_ParseFunction::parse(
@@ -890,7 +869,6 @@ class STL_Evaluator {
         $this->context
       )
     );
-   
   }
   
 }
@@ -919,7 +897,8 @@ class STL_Template {
   public function process() {
     STL_ParseIF::parse($this->get_extended());
     $evaluator = new STL_Evaluator($this->context);
-    return $evaluator->evaluate();
+    $result = $evaluator->evaluate();
+    return $result;
   }
   
   private function add_tpl($tpl, $file = false) {
@@ -934,27 +913,27 @@ class STL_Template {
   
   private function get_extended() {
   
-    $rtpl = '~
-      {\s*content\s*block="%s"\s*}
+    $regex_tpl = '~
+      {\s*block\s+name\s*=\s*"%s"\s*}
         (.*?)
-      {\s*/\s*content\s*}
+      {\s*/\s*block\s*}
     ~six';
     
     if (is_array($this->tpl)) {
       $tpl = array_pop($this->tpl);
       rsort($this->tpl);
       foreach ($this->tpl as $data) {
-        $regex = sprintf($rtpl, '(\w+)');
+        $regex = sprintf($regex_tpl, '(\w+)');
         if (preg_match_all($regex, $tpl, $matches)) {
           foreach($matches[0] as $key=>$match) {
-            $data = preg_replace(sprintf($rtpl, $matches[1][$key]), $match, $data);
+            $data = preg_replace(sprintf($regex_tpl, $matches[1][$key]), $match, $data);
           }
           $tpl = $data;
         }
       }
     }
     
-    return preg_replace(sprintf($rtpl, '\w+'), '$1', $tpl);
+    return preg_replace(sprintf($regex_tpl, '\w+'), '$1', $tpl);
     
   }
   
