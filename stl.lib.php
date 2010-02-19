@@ -65,37 +65,38 @@ class STL_ParseModule {
       )+
     ~six',
     
-    'iterator' => '~
-      {mod:iterator}                  # match outmost opening tag at least with one attribute
+    'each' => '~
+      {mod:each\s+as\s+(\w+?)}        # match outmost opening tag at least with one attribute
       (
         (?:                           # do not capture this match
-          (?!{/?mod:iterator}).       # use negative lookahead to ensure that text does not contain same nested tag 
+          (?!{/?mod:each}).           # use negative lookahead to ensure that text does not contain same nested tag 
           |                           # OR
           (?R)                        # use recursion to handle nested tag
         )*+
       )
-      {/mod:iterator}                 # match outmost closing tag
+      {/mod:each}                     # match outmost closing tag
     ~six'
     
   );
   
-  private static function has_iterator($input) {
-    return strpos($input, 'mod:iterator') !== false;
+  private static function has_each($input) {
+    return strpos($input, 'mod:each') !== false;
   }
   
-  private static function parse_iterator($input) {
+  private static function parse_each($input) {
     
     $block = array();
     
     if (is_array($input)) {
-      $input = $input[1];
-      $block['name'] = 'mod_iterator';
+      $block['name'] = 'mod_each';
+      $block['key']  = $input[1];
+      $input = $input[2];
     }
     
-    $block['body'] = preg_replace_callback(self::$regexs['iterator'], array('self', 'parse_iterator'), $input);
+    $block['body'] = preg_replace_callback(self::$regexs['each'], array('self', 'parse_each'), $input);
     
     if (!empty($block['name'])) {
-      return '#_mod_iterator_'. STL_CodeBlocks::add('mod_iterator', $block);
+      return '#_mod_each_'. STL_CodeBlocks::add('mod_each', $block);
     }
     
     return $block['body'];
@@ -121,7 +122,7 @@ class STL_ParseModule {
     
     if ($input) {
       $block['body'] = preg_replace_callback(self::$regexs['mod'], array('self', 'parse'), $input);
-      $block['body'] = self::parse_iterator($block['body']);
+      $block['body'] = self::parse_each($block['body']);
       
       if (!empty($block['name'])) {
         return '#_mod_'. STL_CodeBlocks::add('mod', $block);
@@ -555,7 +556,7 @@ class STL_GlobalContext {
   public static function getInstance() {
     if (!self::$context) {
       self::$context = new STL_Context();
-      self::$context->putAll(
+      self::$context->put_all(
         array(
           'post' => $_POST,
           'get'  => $_GET
@@ -577,7 +578,7 @@ class STL_Context {
       if (is_array($context)) {
         $this->context = array_merge($this->context, $context);
       } else {
-        $this->context = array_merge($this->context, $context->getAll());
+        $this->context = array_merge($this->context, $context->get_all());
       }
     }
   }
@@ -587,12 +588,12 @@ class STL_Context {
     return $this;
   }
   
-  public function putAll($map) {
+  public function put_all($map) {
     $this->context = array_merge($this->context, $map);
     return $this;
   }
   
-  public function getAll() {
+  public function get_all() {
     return $this->context;
   }
   
@@ -611,7 +612,7 @@ class STL_Context {
     return null;
   }
 
-  private static function getVar($context, $var, $index = null) {
+  private static function get_var($context, $var, $index = null) {
     
     if (is_array($context) && array_key_exists($var, $context)) {
 
@@ -721,7 +722,7 @@ class STL_Context {
         $context = &$this->context;
       }
       
-      $result = $this->getVar(
+      $result = $this->get_var(
         $context, 
         array_shift($matches['var']),
         array_shift($matches['index'])
@@ -729,7 +730,7 @@ class STL_Context {
       
       if (sizeof($matches['var'])) { 
         while($result && sizeof($matches['var'])) {
-          $result = $this->getVar(
+          $result = $this->get_var(
             $result, 
             array_shift($matches['var']),
             array_shift($matches['index'])
@@ -772,20 +773,66 @@ class STL_Context {
 
 class STL_Evaluator {
   
-  private $context;
-  private $include_path = array();
+  private $context       = null;
+  private $include_path  = array();
+  private static $module = null;
   
   public function __construct($context) {
     $this->context = $context;
   }
   
+  private function eval_mod_each($block) {
+    $result = array();
+    $mod = self::$module;
+    if ($mod->is_iterable()) {
+      while ($mod->has_next()) {
+        $context = new STL_Context($this->context);
+        $context->put($block['key'], $mod->next());
+        $parser   = new STL_Evaluator($context);
+        $result[] = STL_ParseFunction::parse(
+          STL_ParseVar::parse($parser->parse($block), $context)
+        );
+      }
+    }
+    
+    return implode('', $result);
+  }
+  
   private function eval_mod($block) {
-    pre($block);
+    
+    $result = null;
+    $class  = array('mod');
+    $path   = array('modules');
+    $path[] = $class[] = $block['package'];
+    $path[] = $class[] = $block['name'];
+    $path   = sprintf('%s.mod.php', implode('/', $path));
+    $class  = implode('_', $class);
+    
+    if (file_exists($path) && !class_exists($class)) {
+      require_once($path);
+      if (class_exists($class)) {
+        $mod = new $class();
+        $mod->add_attributes($block['attributes']);
+        $mod->init();
+        self::$module = $mod;
+        if ($mod->provides_context_data()) {
+          $context = new STL_Context($this->context);
+          $context->put_all($mod->get_context_data());
+          $parser = new STL_Evaluator($context);
+          $result = STL_ParseFunction::parse(
+            STL_ParseVar::parse($parser->parse($block), $context)
+          );
+        }
+      }
+    }
+    
+    return $result;
+    
   }
 
   private function eval_for($block) {
   
-    $array   = $this->context->lookup($block['array']);
+    $array = $this->context->lookup($block['array']);
     
     if (is_array($array)) {
     
@@ -936,5 +983,80 @@ class STL_Template {
     return preg_replace(sprintf($regex_tpl, '\w+'), '$1', $tpl);
     
   }
+  
+}
+
+interface STL_IModuleContextDataProvider {
+  public function get_context_data();
+}
+
+interface STL_IModuleDataIterator {
+  public function has_next();
+  public function next();
+}
+
+abstract class STL_AbstractModule {
+  
+  private   $attributes         = array();
+  protected $allowed_attributes = array();
+  
+  public function __construct() {}
+  
+  private function is_allowed_attribute($name) {
+    return in_array($name, $this->allowed_attributes);
+  }
+  
+  protected function register_attribute($name) {
+    $this->allowed_attributes[] = $name;
+  }
+  
+  protected function register_attributes($attributes) {
+    $this->allowed_attributes = array_merge($this->allowed_attributes, $attributes);
+  }
+  
+  public function set_attribute($name, $value) {
+    if ($this->is_allowed_attribute($name)) {
+      $this->attributes[$name] = $value;
+    }
+    return $this;
+  }
+  
+  public function add_attributes($map) {
+    $this->attributes += array_intersect_key(
+      $map,
+      array_flip(
+        array_filter(
+          array_keys($map), 
+          array($this, 'is_allowed_attribute')
+        )
+      )
+    );
+  }
+  
+  public function get_attribute($name, $default_value = null, $type = null) {
+    $value = null;
+    if (isset($this->attributes[$name])) {
+      $value = $this->attributes[$name];
+    }
+    if (!$value) {
+      $value = $default_value;
+    }
+    if ($type) {
+      settype($value, $type);
+    }
+    return $value;
+  }
+  
+  public function provides_context_data() {
+    $r = new ReflectionObject($this);
+    return $r->implementsInterface('STL_IModuleContextDataProvider');
+  }
+  
+  public function is_iterable() {
+    $r = new ReflectionObject($this);
+    return $r->implementsInterface('STL_IModuleDataIterator');
+  }
+  
+  public abstract function init();
   
 }
