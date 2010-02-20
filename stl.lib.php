@@ -799,7 +799,7 @@ class STL_Evaluator {
   }
   
   private function eval_mod($block) {
-    
+
     $result = null;
     $class  = array('mod');
     $path   = array('modules');
@@ -808,8 +808,12 @@ class STL_Evaluator {
     $path   = sprintf('%s.mod.php', implode('/', $path));
     $class  = implode('_', $class);
     
-    if (file_exists($path) && !class_exists($class)) {
-      require_once($path);
+    if (file_exists($path)) {
+    
+      if (!class_exists($class)) {
+        require_once($path);
+      }
+      
       if (class_exists($class)) {
         $mod = new $class();
         $mod->add_attributes($block['attributes']);
@@ -824,6 +828,7 @@ class STL_Evaluator {
           );
         }
       }
+      
     }
     
     return $result;
