@@ -783,16 +783,34 @@ class STL_Evaluator {
   
   private function eval_mod_each($block) {
     $result = array();
-    $mod = self::$module;
+    $mod    = self::$module;
+    
     if ($mod->is_iterable()) {
+      
+      $handles_output = $mod->handles_iterator_output();
+      
       while ($mod->has_next()) {
+      
         $context = new STL_Context($this->context);
         $context->put($block['key'], $mod->next());
         $parser   = new STL_Evaluator($context);
-        $result[] = STL_ParseFunction::parse(
+        
+        if ($handles_output) {
+          $block['body'] = $mod->pre_process_iterator_output($block['body'], $context);
+        }
+        
+        $output = STL_ParseFunction::parse(
           STL_ParseVar::parse($parser->parse($block), $context)
         );
+        
+        if ($handles_output) {
+          $output = $mod->post_process_iterator_output($output, $context);
+        }
+        
+        $result[] = $output;
+        
       }
+      
     }
     
     return implode('', $result);
@@ -815,18 +833,37 @@ class STL_Evaluator {
       }
       
       if (class_exists($class)) {
-        $mod = new $class();
+      
+        $context = null;
+        $mod     = new $class();
+        
         $mod->add_attributes($block['attributes']);
         $mod->init();
+        
         self::$module = $mod;
+        
         if ($mod->provides_context_data()) {
           $context = new STL_Context($this->context);
-          $context->put_all($mod->get_context_data());
-          $parser = new STL_Evaluator($context);
-          $result = STL_ParseFunction::parse(
-            STL_ParseVar::parse($parser->parse($block), $context)
-          );
+          $context->put_all($mod->get_context_data());          
+        } else {
+          $context = $this->context;
         }
+        
+        $handles_output = $mod->handles_module_output();
+        
+        if ($handles_output) {
+          $block['body'] = $mod->pre_process_module_output($block['body'], $context);
+        }
+        
+        $parser = new STL_Evaluator($context);
+        $result = STL_ParseFunction::parse(
+          STL_ParseVar::parse($parser->parse($block), $context)
+        );
+        
+        if ($handles_output) {
+          $result = $mod->post_process_module_output($result, $context);
+        }
+        
       }
       
     }
@@ -1006,8 +1043,8 @@ interface STL_IModuleDataIterator {
 }
 
 interface STL_IModuleDataIteratorOutputHandler {
-  public function pre_process_iteration_output($input, $context);
-  public function post_process_iteration_output($input, $context);
+  public function pre_process_iterator_output($input, $context);
+  public function post_process_iterator_output($input, $context);
 }
 
 abstract class STL_AbstractModule {
@@ -1070,6 +1107,16 @@ abstract class STL_AbstractModule {
   public function is_iterable() {
     $r = new ReflectionObject($this);
     return $r->implementsInterface('STL_IModuleDataIterator');
+  }
+  
+  public function handles_module_output() {
+    $r = new ReflectionObject($this);
+    return $r->implementsInterface('STL_IModuleOutputHandler');
+  }
+  
+  public function handles_iterator_output() {
+    $r = new ReflectionObject($this);
+    return $r->implementsInterface('STL_IModuleDataIteratorOutputHandler');
   }
   
   public abstract function init();
