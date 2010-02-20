@@ -995,9 +995,19 @@ interface STL_IModuleContextDataProvider {
   public function get_context_data();
 }
 
+interface STL_IModuleOutputHandler {
+  public function pre_process_module_output($input, $context);
+  public function post_process_module_output($input, $context);
+}
+
 interface STL_IModuleDataIterator {
   public function has_next();
   public function next();
+}
+
+interface STL_IModuleDataIteratorOutputHandler {
+  public function pre_process_iteration_output($input, $context);
+  public function post_process_iteration_output($input, $context);
 }
 
 abstract class STL_AbstractModule {
