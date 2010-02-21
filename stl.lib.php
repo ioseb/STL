@@ -786,16 +786,14 @@ class STL_Evaluator {
     $mod    = self::$module;
     
     if ($mod->is_iterable()) {
-      
-      $handles_output = $mod->handles_iterator_output();
-      
+
       while ($mod->has_next()) {
       
         $context = new STL_Context($this->context);
         $context->put($block['key'], $mod->next());
         $parser   = new STL_Evaluator($context);
         
-        if ($handles_output) {
+        if ($mod->pre_processes_iterator_output()) {
           $block['body'] = $mod->pre_process_iterator_output($block['body'], $context);
         }
         
@@ -803,7 +801,7 @@ class STL_Evaluator {
           STL_ParseVar::parse($parser->parse($block), $context)
         );
         
-        if ($handles_output) {
+        if ($mod->post_processes_iterator_output()) {
           $output = $mod->post_process_iterator_output($output, $context);
         }
         
@@ -841,10 +839,8 @@ class STL_Evaluator {
         $mod->init($this->context);
         
         self::$module = $mod;
-        
-        $handles_output = $mod->handles_module_output();
-        
-        if ($handles_output) {
+
+        if ($mod->pre_processes_module_output()) {
           $block['body'] = $mod->pre_process_module_output($block['body'], $this->context);
         }
         
@@ -853,7 +849,7 @@ class STL_Evaluator {
           STL_ParseVar::parse($parser->parse($block), $this->context)
         );
         
-        if ($handles_output) {
+        if ($mod->post_processes_module_output()) {
           $result = $mod->post_process_module_output($result, $this->context);
         }
         
@@ -1046,7 +1042,6 @@ interface STL_IModuleDataIteratorOutputPostProcessor {
   public function post_process_iterator_output($input, STL_Context $context);
 }
 
-
 interface STL_IModuleDataIteratorOutputHandler
   extends STL_IModuleDataIteratorOutputPreProcessor, 
     STL_IModuleDataIteratorOutputPostProcessor {}
@@ -1108,14 +1103,24 @@ abstract class STL_AbstractModule {
     return $r->implementsInterface('STL_IModuleDataIterator');
   }
   
-  public function handles_module_output() {
+  public function pre_processes_module_output() {
     $r = new ReflectionObject($this);
-    return $r->implementsInterface('STL_IModuleOutputHandler');
+    return $r->implementsInterface('STL_IModuleOutputPreProcessor');
   }
   
-  public function handles_iterator_output() {
+  public function post_processes_module_output() {
     $r = new ReflectionObject($this);
-    return $r->implementsInterface('STL_IModuleDataIteratorOutputHandler');
+    return $r->implementsInterface('STL_IModuleOutputPostProcessor');
+  }
+  
+  public function pre_processes_iterator_output() {
+    $r = new ReflectionObject($this);
+    return $r->implementsInterface('STL_IModuleDataIteratorOutputPreProcessor');
+  }
+  
+  public function post_processes_iterator_output() {
+    $r = new ReflectionObject($this);
+    return $r->implementsInterface('STL_IModuleDataIteratorOutputPostProcessor');
   }
   
   public abstract function init(STL_Context $context);
