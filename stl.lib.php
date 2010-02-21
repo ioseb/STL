@@ -1021,20 +1021,35 @@ class STL_Template {
   
 }
 
-interface STL_IModuleOutputHandler {
+interface STL_IModuleOutputPreProcessor {
   public function pre_process_module_output($input, STL_Context $context);
+}
+
+interface STL_IModuleOutputPostProcessor {
   public function post_process_module_output($input, STL_Context $context);
 }
+
+interface STL_IModuleOutputHandler 
+  extends STL_IModuleOutputPreProcessor, 
+    STL_IModuleOutputPostProcessor {}
 
 interface STL_IModuleDataIterator {
   public function has_next();
   public function next();
 }
 
-interface STL_IModuleDataIteratorOutputHandler {
+interface STL_IModuleDataIteratorOutputPreProcessor {
   public function pre_process_iterator_output($input, STL_Context $context);
+}
+
+interface STL_IModuleDataIteratorOutputPostProcessor {
   public function post_process_iterator_output($input, STL_Context $context);
 }
+
+
+interface STL_IModuleDataIteratorOutputHandler
+  extends STL_IModuleDataIteratorOutputPreProcessor, 
+    STL_IModuleDataIteratorOutputPostProcessor {}
 
 abstract class STL_AbstractModule {
   
