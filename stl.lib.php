@@ -1025,7 +1025,7 @@ interface STL_IModuleOutputPostProcessor {
   public function post_process_module_output($input, STL_Context $context);
 }
 
-interface STL_IModuleOutputHandler 
+interface STL_IModuleOutputProcessor 
   extends STL_IModuleOutputPreProcessor, 
     STL_IModuleOutputPostProcessor {}
 
@@ -1042,7 +1042,7 @@ interface STL_IModuleDataIteratorOutputPostProcessor {
   public function post_process_iterator_output($input, STL_Context $context);
 }
 
-interface STL_IModuleDataIteratorOutputHandler
+interface STL_IModuleDataIteratorOutputProcessor
   extends STL_IModuleDataIteratorOutputPreProcessor, 
     STL_IModuleDataIteratorOutputPostProcessor {}
 
