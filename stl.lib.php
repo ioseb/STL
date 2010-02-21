@@ -1099,28 +1099,23 @@ abstract class STL_AbstractModule {
   }
 
   public function is_iterable() {
-    $r = new ReflectionObject($this);
-    return $r->implementsInterface('STL_IModuleDataIterator');
+    return $this instanceof STL_IModuleDataIterator;
   }
   
   public function pre_processes_module_output() {
-    $r = new ReflectionObject($this);
-    return $r->implementsInterface('STL_IModuleOutputPreProcessor');
+    return $this instanceof STL_IModuleOutputPreProcessor;
   }
   
   public function post_processes_module_output() {
-    $r = new ReflectionObject($this);
-    return $r->implementsInterface('STL_IModuleOutputPostProcessor');
+    return $this instanceof STL_IModuleOutputPostProcessor;
   }
   
   public function pre_processes_iterator_output() {
-    $r = new ReflectionObject($this);
-    return $r->implementsInterface('STL_IModuleDataIteratorOutputPreProcessor');
+    return $this instanceof STL_IModuleDataIteratorOutputPreProcessor;
   }
   
   public function post_processes_iterator_output() {
-    $r = new ReflectionObject($this);
-    return $r->implementsInterface('STL_IModuleDataIteratorOutputPostProcessor');
+    return $this instanceof STL_IModuleDataIteratorOutputPostProcessor;
   }
   
   public abstract function init(STL_Context $context);
