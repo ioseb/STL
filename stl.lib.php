@@ -838,30 +838,23 @@ class STL_Evaluator {
         $mod     = new $class();
         
         $mod->add_attributes($block['attributes']);
-        $mod->init();
+        $mod->init($this->context);
         
         self::$module = $mod;
-        
-        if ($mod->provides_context_data()) {
-          $context = new STL_Context($this->context);
-          $context->put_all($mod->get_context_data());          
-        } else {
-          $context = $this->context;
-        }
         
         $handles_output = $mod->handles_module_output();
         
         if ($handles_output) {
-          $block['body'] = $mod->pre_process_module_output($block['body'], $context);
+          $block['body'] = $mod->pre_process_module_output($block['body'], $this->context);
         }
         
-        $parser = new STL_Evaluator($context);
+        $parser = new STL_Evaluator($this->context);
         $result = STL_ParseFunction::parse(
-          STL_ParseVar::parse($parser->parse($block), $context)
+          STL_ParseVar::parse($parser->parse($block), $this->context)
         );
         
         if ($handles_output) {
-          $result = $mod->post_process_module_output($result, $context);
+          $result = $mod->post_process_module_output($result, $this->context);
         }
         
       }
@@ -1028,10 +1021,6 @@ class STL_Template {
   
 }
 
-interface STL_IModuleContextDataProvider {
-  public function get_context_data();
-}
-
 interface STL_IModuleOutputHandler {
   public function pre_process_module_output($input, $context);
   public function post_process_module_output($input, $context);
@@ -1098,12 +1087,7 @@ abstract class STL_AbstractModule {
     }
     return $value;
   }
-  
-  public function provides_context_data() {
-    $r = new ReflectionObject($this);
-    return $r->implementsInterface('STL_IModuleContextDataProvider');
-  }
-  
+
   public function is_iterable() {
     $r = new ReflectionObject($this);
     return $r->implementsInterface('STL_IModuleDataIterator');
@@ -1119,6 +1103,6 @@ abstract class STL_AbstractModule {
     return $r->implementsInterface('STL_IModuleDataIteratorOutputHandler');
   }
   
-  public abstract function init();
+  public abstract function init(STL_Context $context);
   
 }
