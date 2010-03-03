@@ -59,22 +59,7 @@ class STL_ParseModule {
         {\s*/\s*\1:\2\s*}             # match outmost closing tag
       )
     ~six',
-    
-    'tag' => '~
-      {(\w+):(\w+)                    # match outmost opening tag at least with one attribute
-        (
-          (?:                         # do not capture this match
-            \s+                       # at least one white space
-            \w+                       # capture attribute name 
-            \s*                       # any number of white spaces
-            =                         # check equals sign
-            \s*                       # any number of white spaces
-            ".*?"                     # capture attribute value 
-          )*+
-        )
-      \s*/\s*} 
-    ~six',
-    
+
     'attributes' => '~
       (?:
         (?P<att>\w+)                  # capture attribute name 
