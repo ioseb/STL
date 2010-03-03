@@ -813,46 +813,42 @@ class STL_Evaluator {
     $path   = sprintf('%s.mod.php', implode('/', $path));
     $class  = implode('_', $class);
     
-    if (file_exists($path)) {
+    if (file_exists($path) && !class_exists($class)) {
+      require_once($path);
+    }
+      
+    if (class_exists($class)) {
     
-      if (!class_exists($class)) {
-        require_once($path);
-      }
+      $context = null;
+      $mod     = new $class();
       
-      if (class_exists($class)) {
+      $mod->add_attributes($block['attributes']);
       
-        $context = null;
-        $mod     = new $class();
+      if ($block['type'] == 'mod') {
+      
+        $mod->init($this->context);
         
-        $mod->add_attributes($block['attributes']);
-        
-        if ($block['type'] == 'mod') {
-        
-          $mod->init($this->context);
-          
-          self::$module = $mod;
-  
-          if ($mod->pre_processes_module_output()) {
-            $block['body'] = $mod->pre_process_module_output($block['body'], $this->context);
-          }
-          
-          $parser = new STL_Evaluator($this->context);
-          $result = STL_ParseFunction::parse(
-            STL_ParseVar::parse($parser->parse($block), $this->context)
-          );
-          
-          if ($mod->post_processes_module_output()) {
-            $result = $mod->post_process_module_output($result, $this->context);
-          }
-          
-        } else {
-          $result = $mod->init($this->context);
+        self::$module = $mod;
+
+        if ($mod->pre_processes_module_output()) {
+          $block['body'] = $mod->pre_process_module_output($block['body'], $this->context);
         }
         
+        $parser = new STL_Evaluator($this->context);
+        $result = STL_ParseFunction::parse(
+          STL_ParseVar::parse($parser->parse($block), $this->context)
+        );
+        
+        if ($mod->post_processes_module_output()) {
+          $result = $mod->post_process_module_output($result, $this->context);
+        }
+        
+      } else {
+        $result = $mod->init($this->context);
       }
       
     }
-    
+
     return $result;
     
   }
