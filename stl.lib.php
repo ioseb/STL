@@ -805,16 +805,22 @@ class STL_Evaluator {
   }
   
   private function eval_mod($block) {
-    $result = null;
-    $class  = array('mod');
-    $path   = array('modules');
-    $path[] = $class[] = $block['package'];
-    $path[] = $class[] = $block['name'];
-    $path   = sprintf('%s.mod.php', implode('/', $path));
-    $class  = implode('_', $class);
+    $result  = null;
+    $class   = array('mod');
+    $path    = array('modules');
+    $path[]  = $class[] = $block['package'];
+    $class[] = $block['name'];
+    $mpath   = sprintf('%s/%s.mod.php', implode('/', $path), $block['name']);
+    $lpath   = sprintf('%s/%s.lib.php',    implode('/', $path), $block['package']);
+    $class   = implode('_', $class);
     
-    if (file_exists($path) && !class_exists($class)) {
-      require_once($path);
+    if (!class_exists($class)) {
+      if (file_exists($mpath)) {
+        require_once($mpath);
+      }
+      if (file_exists($lpath)) {
+        require_once($lpath);
+      }
     }
       
     if (class_exists($class)) {
