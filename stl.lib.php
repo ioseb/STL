@@ -184,7 +184,7 @@ class STL_ParseCondition {
   public static function parse($input) {
     
     $logical    = '~\s+(?P<oper>and|or|&&|\|\|)\s+~';
-    $comparison = '~(==|!=|<>|>=|<=|>|<|\s+in\s+)~';
+    $comparison = '~(===|!==|==|!=|<>|>=|<=|>|<|\s+in\s+)~';
     
     $tokens = preg_split($logical, $input, 0, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
     
@@ -348,7 +348,9 @@ class STL_ParseIF {
 class STL_Condition {
   
   private static $methods = array(
+    '===' => array('self', 'if_eqs'),
     '=='  => array('self', 'if_eq'),
+    '!==' => array('self', 'if_neqs'),
     '!='  => array('self', 'if_neq'),
     '<>'  => array('self', 'if_neq'),
     '>='  => array('self', 'if_geq'),
@@ -367,8 +369,16 @@ class STL_Condition {
     return $v1 == $v2;
   }
   
+  private static function if_eqs($v1, $v2) {
+    return $v1 === $v2;
+  }
+  
   private static function if_neq($v1, $v2) {
     return $v1 != $v2;
+  }
+  
+  private static function if_neqs($v1, $v2) {
+    return $v1 !== $v2;
   }
   
   private static function if_not($v) {
