@@ -33,6 +33,34 @@ class STL_ParseModule {
   private static $regexs = array(
   
     'mod' => '~
+      {\s*(\w+):(\w+)                 # match outmost opening tag at least with one attribute
+        (
+          (?:                         # do not capture this match
+            \s+                       # at least one white space
+            \w+                       # capture attribute name 
+            \s*                       # any number of white spaces
+            =                         # check equals sign
+            \s*                       # any number of white spaces
+            ".*?"                     # capture attribute value 
+          )*+
+        )
+      \s*                             # any number of white spaces
+      (?:                             # do not capture this match
+        /\s*}                         # self terminated tag without body
+        |                             # OR
+        }                             # tag with body
+        (
+          (?:                         # do not capture this match
+            (?!{\s*/?\1:\2\s*).       # use negative lookahead to ensure that text does not contain same nested tag 
+            |                         # OR
+            (?R)                      # use recursion to handle nested tag
+          )*+
+        )
+        {\s*/\s*\1:\2\s*}             # match outmost closing tag
+      )
+    ~six',
+    
+    'tag' => '~
       {(\w+):(\w+)                    # match outmost opening tag at least with one attribute
         (
           (?:                         # do not capture this match
@@ -44,15 +72,7 @@ class STL_ParseModule {
             ".*?"                     # capture attribute value 
           )*+
         )
-      }                   
-      (
-        (?:                           # do not capture this match
-          (?!{/?\1:\2).               # use negative lookahead to ensure that text does not contain same nested tag 
-          |                           # OR
-          (?R)                        # use recursion to handle nested tag
-        )*+
-      )
-      {/\1:\2}                        # match outmost closing tag
+      \s*/\s*} 
     ~six',
     
     'attributes' => '~
@@ -110,7 +130,8 @@ class STL_ParseModule {
     if (is_array($input)) {
       $block = array(
         'package' => $input[1],
-        'name' => $input[2]
+        'name'    => $input[2],
+        'type'    => sizeof($input) == 5 ? 'mod' : 'tag',
       );
       if (preg_match_all(self::$regexs['attributes'], $input[3], $matches)) {
         $block['attributes'] = array_combine($matches['att'], $matches['val']);
@@ -127,8 +148,12 @@ class STL_ParseModule {
       if (!empty($block['name'])) {
         return '#_mod_'. STL_CodeBlocks::add('mod', $block);
       }
-      
+
       return $block['body'];
+    } else {
+      if (!empty($block) && $block['type'] == 'tag') {
+        return '#_mod_'. STL_CodeBlocks::add('mod', $block);
+      }
     }
     
     return null;
@@ -795,7 +820,6 @@ class STL_Evaluator {
   }
   
   private function eval_mod($block) {
-
     $result = null;
     $class  = array('mod');
     $path   = array('modules');
@@ -816,21 +840,28 @@ class STL_Evaluator {
         $mod     = new $class();
         
         $mod->add_attributes($block['attributes']);
-        $mod->init($this->context);
         
-        self::$module = $mod;
-
-        if ($mod->pre_processes_module_output()) {
-          $block['body'] = $mod->pre_process_module_output($block['body'], $this->context);
-        }
+        if ($block['type'] == 'mod') {
         
-        $parser = new STL_Evaluator($this->context);
-        $result = STL_ParseFunction::parse(
-          STL_ParseVar::parse($parser->parse($block), $this->context)
-        );
-        
-        if ($mod->post_processes_module_output()) {
-          $result = $mod->post_process_module_output($result, $this->context);
+          $mod->init($this->context);
+          
+          self::$module = $mod;
+  
+          if ($mod->pre_processes_module_output()) {
+            $block['body'] = $mod->pre_process_module_output($block['body'], $this->context);
+          }
+          
+          $parser = new STL_Evaluator($this->context);
+          $result = STL_ParseFunction::parse(
+            STL_ParseVar::parse($parser->parse($block), $this->context)
+          );
+          
+          if ($mod->post_processes_module_output()) {
+            $result = $mod->post_process_module_output($result, $this->context);
+          }
+          
+        } else {
+          $result = $mod->init($this->context);
         }
         
       }
@@ -1076,6 +1107,10 @@ abstract class STL_AbstractModule {
       settype($value, $type);
     }
     return $value;
+  }
+  
+  public function get_attributes() {
+    return $this->attributes;
   }
 
   public function is_iterable() {
