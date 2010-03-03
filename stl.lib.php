@@ -238,15 +238,47 @@ class STL_ParseForEach {
       }                   
       (
         (?:                           # do not capture this match
-          (?!{/?for).                 # use negative lookahead to ensure that text does not contain same nested tag 
+          (?!{/?for(?!else)).         # use negative lookahead to ensure that text does not contain same nested tag 
           |                           # OR
           (?R)                        # use recursion to handle nested tag
         )++
       )
      {\s*/\s*for\s*}                  # match outmost closing tag
-    ~six'
+    ~six',
+    
+    'else' => '~{\s*forelse\s*}~',
 
   );
+  
+  private static function parse_else(&$input) {
+  
+    if (!empty($input['body'])) {
+    
+      if ($tokens = preg_split(self::$regexs['else'], $input['body'], -1, PREG_SPLIT_DELIM_CAPTURE)) {
+  
+        $input['body'] = array_shift($tokens);
+
+        if (!empty($tokens)) {
+        
+          if (empty($input['forelse'])) {
+            $input['forelse'] = array();
+          }
+          
+          $tokens = array_chunk($tokens, 2);
+          
+          foreach ($tokens as $token) {
+            $input['forelse'] = array(
+              'body' => trim(array_shift($token))
+            );
+          }
+
+        }
+        
+      }
+      
+    }
+    
+  }
   
   public static function parse($input) {
     
@@ -261,6 +293,7 @@ class STL_ParseForEach {
     $block['body'] = trim(preg_replace_callback(self::$regexs['for'], array('self', 'parse'), $input));
     
     if (!empty($block['var'])) {
+      self::parse_else($block);
       return '#_for_'. STL_CodeBlocks::add('for', $block);
     }
     
@@ -881,12 +914,12 @@ class STL_Evaluator {
   }
 
   private function eval_for($block) {
-  
-    $array = $this->context->lookup($block['array']);
+    
+    $result = array();
+    $array  = $this->context->lookup($block['array']);
     
     if (is_array($array)) {
     
-      $result  = array();
       $context = new STL_Context($this->context);
       
       foreach ($array as $k => $v) {
@@ -903,6 +936,8 @@ class STL_Evaluator {
         
       }
       
+    } else if (!empty($block['forelse'])) {
+      $result[] = $this->parse($block['forelse']);
     }
     
     return implode('', $result);
