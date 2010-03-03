@@ -596,27 +596,13 @@ class STL_Context {
   public function get_all() {
     return $this->context;
   }
-  
-  private static function isNS($var) {
-    $var = strtolower($var);
-    if (in_array($var, self::$ns)) {
-      switch($var) {
-        case 'get':
-          return $_GET;
-        case 'post':
-          return $_POST;
-        case 'env':
-          return array();        
-      }
-    }
-    return null;
-  }
 
   private static function get_var($context, $var, $index = null) {
     
     if (is_array($context) && array_key_exists($var, $context)) {
 
       $context = $context[$var];
+      
       if (is_numeric($index) && array_key_exists($index, $context)) {
         $context = $context[$index];
       }
@@ -698,10 +684,10 @@ class STL_Context {
   
   public function lookup($var, $gc = true) {
     
-    $regex = '~
+    $result = null;
+    $regex  = '~
       (?:
         (?P<var>\w+)                  # match variable name
-        \s*                           # any number of white spaces
         (?:                           # do not capture this match
           \[                          # match opening square bracket
             \s*                       # any number of white spaces
@@ -709,18 +695,15 @@ class STL_Context {
             \s*                       # any number of white spaces
           \]                          # match closing square bracket
         )?                            # make this match optionsl
-        \s*                           # any number of white spaces
         (?:\.)?                       # optionally match trailing dot
       ) 
     ~six';
-    
-    if (preg_match_all($regex, $var, $matches)) {
 
-      $context = null;
-      
-      if (!$context = self::isNS($matches['var'][0])) {
-        $context = &$this->context;
-      }
+    $context = &$this->context;
+    
+    if (strpos($var, '.') === false && strpos($var, '[') === false) {
+      $result = $this->get_var($context, $var);
+    } else if (preg_match_all($regex, $var, $matches)) {
       
       $result = $this->get_var(
         $context, 
@@ -740,16 +723,13 @@ class STL_Context {
       
       if ($gc) {
         if (is_null($result)) {
-         return STL_GlobalContext::lookup($var);
+         $result = STL_GlobalContext::lookup($var);
         }
-        return $result;
       }
-      
-      return $result;
       
     }
     
-    return null;
+    return $result;
     
   }
   
