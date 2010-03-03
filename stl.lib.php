@@ -33,7 +33,7 @@ class STL_ParseModule {
   private static $regexs = array(
   
     'mod' => '~
-      {mod:(\w+):(\w+)                # match outmost opening tag at least with one attribute
+      {(\w+):(\w+)                    # match outmost opening tag at least with one attribute
         (
           (?:                         # do not capture this match
             \s+                       # at least one white space
@@ -47,12 +47,12 @@ class STL_ParseModule {
       }                   
       (
         (?:                           # do not capture this match
-          (?!{/?mod:\1:\2).           # use negative lookahead to ensure that text does not contain same nested tag 
+          (?!{/?\1:\2).               # use negative lookahead to ensure that text does not contain same nested tag 
           |                           # OR
           (?R)                        # use recursion to handle nested tag
         )*+
       )
-      {/mod:\1:\2}                    # match outmost closing tag
+      {/\1:\2}                        # match outmost closing tag
     ~six',
     
     'attributes' => '~
