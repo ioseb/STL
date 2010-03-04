@@ -28,11 +28,11 @@ class STL_CodeBlocks {
   
 }
 
-class STL_ParseModule {
+class STL_ParseExtension {
   
   private static $regexs = array(
   
-    'mod' => '~
+    'ext' => '~
       {\s*(\w+):(\w+)                 # match outmost opening tag at least with one attribute
         (
           (?:                         # do not capture this match
@@ -71,21 +71,21 @@ class STL_ParseModule {
     ~six',
     
     'each' => '~
-      {mod:each\s+as\s+(\w+?)}        # match outmost opening tag at least with one attribute
+      {ext:each\s+as\s+(\w+?)}        # match outmost opening tag at least with one attribute
       (
         (?:                           # do not capture this match
-          (?!{/?mod:each}).           # use negative lookahead to ensure that text does not contain same nested tag 
+          (?!{/?ext:each}).           # use negative lookahead to ensure that text does not contain same nested tag 
           |                           # OR
           (?R)                        # use recursion to handle nested tag
         )*+
       )
-      {/mod:each}                     # match outmost closing tag
+      {/ext:each}                     # match outmost closing tag
     ~six'
     
   );
   
   private static function has_each($input) {
-    return strpos($input, 'mod:each') !== false;
+    return strpos($input, 'ext:each') !== false;
   }
   
   private static function parse_each($input) {
@@ -93,7 +93,7 @@ class STL_ParseModule {
     $block = array();
     
     if (is_array($input)) {
-      $block['name'] = 'mod_each';
+      $block['name'] = 'ext_each';
       $block['key']  = $input[1];
       $input = $input[2];
     }
@@ -101,7 +101,7 @@ class STL_ParseModule {
     $block['body'] = preg_replace_callback(self::$regexs['each'], array('self', 'parse_each'), $input);
     
     if (!empty($block['name'])) {
-      return '#_mod_each_'. STL_CodeBlocks::add('mod_each', $block);
+      return '#_ext_each_'. STL_CodeBlocks::add('ext_each', $block);
     }
     
     return $block['body'];
@@ -116,7 +116,7 @@ class STL_ParseModule {
       $block = array(
         'package' => $input[1],
         'name'    => $input[2],
-        'type'    => sizeof($input) == 5 ? 'mod' : 'tag',
+        'type'    => sizeof($input) == 5 ? 'ext' : 'tag',
       );
       if (preg_match_all(self::$regexs['attributes'], $input[3], $matches)) {
         $block['attributes'] = array_combine($matches['att'], $matches['val']);
@@ -127,17 +127,17 @@ class STL_ParseModule {
     $input = trim($input);
     
     if ($input) {
-      $block['body'] = preg_replace_callback(self::$regexs['mod'], array('self', 'parse'), $input);
+      $block['body'] = preg_replace_callback(self::$regexs['ext'], array('self', 'parse'), $input);
       $block['body'] = self::parse_each($block['body']);
       
       if (!empty($block['name'])) {
-        return '#_mod_'. STL_CodeBlocks::add('mod', $block);
+        return '#_ext_'. STL_CodeBlocks::add('ext', $block);
       }
 
       return $block['body'];
     } else {
       if (!empty($block) && $block['type'] == 'tag') {
-        return '#_mod_'. STL_CodeBlocks::add('mod', $block);
+        return '#_ext_'. STL_CodeBlocks::add('ext', $block);
       }
     }
     
@@ -370,7 +370,7 @@ class STL_ParseIF {
     );
     
     self::parse_else($block);
-    $block['body'] = STL_ParseModule::parse(STL_ParseForEach::parse($block['body']));
+    $block['body'] = STL_ParseExtension::parse(STL_ParseForEach::parse($block['body']));
         
     return '#_if_'. STL_CodeBlocks::add('if', $block);
     
@@ -820,34 +820,34 @@ class STL_Evaluator {
   
   private $context       = null;
   private $include_path  = array();
-  private static $module = null;
+  private static $extension = null;
   
   public function __construct($context) {
     $this->context = $context;
   }
   
-  private function eval_mod_each($block) {
+  private function eval_ext_each($block) {
     $result = array();
-    $mod    = self::$module;
+    $ext    = self::$extension;
     
-    if ($mod->is_iterable()) {
+    if ($ext->is_iterable()) {
 
-      while ($mod->has_next()) {
+      while ($ext->has_next()) {
       
         $context = new STL_Context($this->context);
-        $context->put($block['key'], $mod->next());
+        $context->put($block['key'], $ext->next());
         $parser   = new STL_Evaluator($context);
         
-        if ($mod->pre_processes_iterator_output()) {
-          $block['body'] = $mod->pre_process_iterator_output($block['body'], $context);
+        if ($ext->pre_processes_iterator_output()) {
+          $block['body'] = $ext->pre_process_iterator_output($block['body'], $context);
         }
         
         $output = STL_ParseFunction::parse(
           STL_ParseVar::parse($parser->parse($block), $context)
         );
         
-        if ($mod->post_processes_iterator_output()) {
-          $output = $mod->post_process_iterator_output($output, $context);
+        if ($ext->post_processes_iterator_output()) {
+          $output = $ext->post_process_iterator_output($output, $context);
         }
         
         $result[] = $output;
@@ -859,40 +859,28 @@ class STL_Evaluator {
     return implode('', $result);
   }
   
-  private function eval_mod($block) {
-    $result  = null;
-    $class   = array('mod');
-    $path    = array('modules');
-    $path[]  = $class[] = $block['package'];
-    $class[] = $block['name'];
-    $mpath   = sprintf('%s/%s.mod.php', implode('/', $path), $block['name']);
-    $lpath   = sprintf('%s/%s.lib.php',    implode('/', $path), $block['package']);
-    $class   = implode('_', $class);
+  private function eval_ext($block) {
     
-    if (!class_exists($class)) {
-      if (file_exists($mpath)) {
-        require_once($mpath);
-      }
-      if (file_exists($lpath)) {
-        require_once($lpath);
-      }
-    }
+    STL_FileLoader::load_extension($block['package'], $block['name']);
+    
+    $result  = null;
+    $class   = sprintf('ext_%s_%s', $block['package'], $block['name']);
       
     if (class_exists($class)) {
     
       $context = null;
-      $mod     = new $class();
+      $ext     = new $class();
       
-      $mod->add_attributes($block['attributes']);
+      $ext->add_attributes($block['attributes']);
       
-      if ($block['type'] == 'mod') {
+      if ($block['type'] == 'ext') {
       
-        $mod->init($this->context);
+        $ext->init($this->context);
         
-        self::$module = $mod;
+        self::$extension = $ext;
 
-        if ($mod->pre_processes_module_output()) {
-          $block['body'] = $mod->pre_process_module_output($block['body'], $this->context);
+        if ($ext->pre_processes_extension_output()) {
+          $block['body'] = $ext->pre_process_extension_output($block['body'], $this->context);
         }
         
         $parser = new STL_Evaluator($this->context);
@@ -900,12 +888,12 @@ class STL_Evaluator {
           STL_ParseVar::parse($parser->parse($block), $this->context)
         );
         
-        if ($mod->post_processes_module_output()) {
-          $result = $mod->post_process_module_output($result, $this->context);
+        if ($ext->post_processes_extension_output()) {
+          $result = $ext->post_process_extension_output($result, $this->context);
         }
         
       } else {
-        $result = $mod->init($this->context);
+        $result = $ext->init($this->context);
       }
       
     }
@@ -1006,10 +994,12 @@ class STL_Evaluator {
   
 }
 
-class STL_Config {
+class STL_FileLoader {
+
   private static $template_dirs = array();
-  private static $plugin_dirs   = array();
-  
+  private static $extension_dirs   = array();
+  private static $templates     = array();
+
   private static function dir($dir) {
     $doc_root = $_SERVER['DOCUMENT_ROOT'];
     $dir      = preg_replace(sprintf('~^%s~', $doc_root), '', '/'. trim($dir, '\/'));
@@ -1025,8 +1015,53 @@ class STL_Config {
     self::$template_dirs[] = self::dir($dir);
   }
   
-  public static function add_plugin_dir($dir) {
-    self::$plugin_dirs = self::dir($dir);
+  public static function add_extension_dir($dir) {
+    self::$extension_dirs[] = self::dir($dir);
+  }
+  
+  public static function load_template($name) {
+    $name = trim($name, '\/');
+    
+    foreach (self::$template_dirs as $dir) {
+      
+      $path = sprintf('%s/%s', $dir, $name);
+      $hash = md5($path);
+    
+      if (isset(self::$templates[$hash])) {
+        return self::$templates[$hash];
+      } else if (file_exists($path)) {
+        return (self::$templates[$hash] = file_get_contents($file));
+      }
+      
+    }
+    
+    return null;
+  }
+  
+  public static function load_extension($package, $name) {
+
+    $class = sprintf('ext_%s_%s', $package, $name);
+    
+    if (!class_exists($class)) {
+
+      foreach (self::$extension_dirs as $dir) {
+      
+        $mpath = sprintf('%s/%s/%s.ext.php', $dir, $package, $name);
+        $lpath = sprintf('%s/%s/%s.lib.php', $dir, $package, $package);
+        
+        if (file_exists($mpath)) {
+          require_once($mpath);
+        }
+        
+        if (file_exists($lpath)) {
+          require_once($lpath);
+        }
+        
+      }
+      
+    }
+    
+    return null;
   }
   
 }
@@ -1096,45 +1131,45 @@ class STL_Template {
   }
   
   public static function add_template_dir($dir) {
-    STL_Config::add_template_dir($dir);
+    STL_FileLoader::add_template_dir($dir);
   }
   
-  public static function add_plugin_dir($dir) {
-    STL_Config::add_plugin_dir($dir);
+  public static function add_extension_dir($dir) {
+    STL_FileLoader::add_extension_dir($dir);
   }
   
 }
 
-interface STL_IModuleOutputPreProcessor {
-  public function pre_process_module_output($input, STL_Context $context);
+interface STL_IExtensionOutputPreProcessor {
+  public function pre_process_extension_output($input, STL_Context $context);
 }
 
-interface STL_IModuleOutputPostProcessor {
-  public function post_process_module_output($input, STL_Context $context);
+interface STL_IExtensionOutputPostProcessor {
+  public function post_process_extension_output($input, STL_Context $context);
 }
 
-interface STL_IModuleOutputProcessor 
-  extends STL_IModuleOutputPreProcessor, 
-    STL_IModuleOutputPostProcessor {}
+interface STL_IExtensionOutputProcessor 
+  extends STL_IExtensionOutputPreProcessor, 
+    STL_IExtensionOutputPostProcessor {}
 
-interface STL_IModuleDataIterator {
+interface STL_IExtensionDataIterator {
   public function has_next();
   public function next();
 }
 
-interface STL_IModuleDataIteratorOutputPreProcessor {
+interface STL_IExtensionDataIteratorOutputPreProcessor {
   public function pre_process_iterator_output($input, STL_Context $context);
 }
 
-interface STL_IModuleDataIteratorOutputPostProcessor {
+interface STL_IExtensionDataIteratorOutputPostProcessor {
   public function post_process_iterator_output($input, STL_Context $context);
 }
 
-interface STL_IModuleDataIteratorOutputProcessor
-  extends STL_IModuleDataIteratorOutputPreProcessor, 
-    STL_IModuleDataIteratorOutputPostProcessor {}
+interface STL_IExtensionDataIteratorOutputProcessor
+  extends STL_IExtensionDataIteratorOutputPreProcessor, 
+    STL_IExtensionDataIteratorOutputPostProcessor {}
 
-abstract class STL_AbstractModule {
+abstract class STL_AbstractExtension {
   
   private   $attributes         = array();
   protected $allowed_attributes = array();
@@ -1191,23 +1226,23 @@ abstract class STL_AbstractModule {
   }
 
   public function is_iterable() {
-    return $this instanceof STL_IModuleDataIterator;
+    return $this instanceof STL_IExtensionDataIterator;
   }
   
-  public function pre_processes_module_output() {
-    return $this instanceof STL_IModuleOutputPreProcessor;
+  public function pre_processes_extension_output() {
+    return $this instanceof STL_IExtensionOutputPreProcessor;
   }
   
-  public function post_processes_module_output() {
-    return $this instanceof STL_IModuleOutputPostProcessor;
+  public function post_processes_extension_output() {
+    return $this instanceof STL_IExtensionOutputPostProcessor;
   }
   
   public function pre_processes_iterator_output() {
-    return $this instanceof STL_IModuleDataIteratorOutputPreProcessor;
+    return $this instanceof STL_IExtensionDataIteratorOutputPreProcessor;
   }
   
   public function post_processes_iterator_output() {
-    return $this instanceof STL_IModuleDataIteratorOutputPostProcessor;
+    return $this instanceof STL_IExtensionDataIteratorOutputPostProcessor;
   }
   
   public abstract function init(STL_Context $context);
