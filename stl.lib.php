@@ -1012,14 +1012,16 @@ class STL_FileLoader {
   }
   
   public static function add_template_dir($dir) {
-    self::$template_dirs[] = self::dir($dir);
+    $dir = self::dir($dir);
+    self::$template_dirs[md5($dir)] = $dir;
   }
   
   public static function add_extension_dir($dir) {
-    self::$extension_dirs[] = self::dir($dir);
+    $dir = self::dir($dir);
+    self::$extension_dirs[md5($dir)] = $dir;
   }
   
-  public static function load_template($name) {
+  public static function get_template($name) {
     $name = trim($name, '\/');
     
     foreach (self::$template_dirs as $dir) {
@@ -1030,7 +1032,7 @@ class STL_FileLoader {
       if (isset(self::$templates[$hash])) {
         return self::$templates[$hash];
       } else if (file_exists($path)) {
-        return (self::$templates[$hash] = file_get_contents($file));
+        return (self::$templates[$hash] = file_get_contents($path));
       }
       
     }
@@ -1083,7 +1085,7 @@ class STL_Template {
   }
   
   public function extend($tpl, $file = false) {
-    array_unshift($this->tpl, $file ? file_get_contents($tpl) : $tpl);
+    array_unshift($this->tpl, $file ? STL_FileLoader::get_template($tpl) : $tpl);
     return $this;
   }
   
@@ -1098,9 +1100,7 @@ class STL_Template {
     if (!$file) {
       $this->tpl[] = $tpl;
     } else {
-      if (file_exists($tpl)) {
-        $this->tpl[] = file_get_contents($tpl);
-      }
+      $this->tpl[] = STL_FileLoader::get_template($tpl);
     }
   }
   
