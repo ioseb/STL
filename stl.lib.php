@@ -1006,6 +1006,31 @@ class STL_Evaluator {
   
 }
 
+class STL_Config {
+  private static $template_dirs = array();
+  private static $plugin_dirs   = array();
+  
+  private static function dir($dir) {
+    $doc_root = $_SERVER['DOCUMENT_ROOT'];
+    $dir      = preg_replace(sprintf('~^%s~', $doc_root), '', '/'. trim($dir, '\/'));
+    
+    if ($dir{0} != '/') {
+      $dir = '/'. $dir;
+    }
+    
+    return $doc_root . $dir;
+  }
+  
+  public static function add_template_dir($dir) {
+    self::$template_dirs[] = self::dir($dir);
+  }
+  
+  public static function add_plugin_dir($dir) {
+    self::$plugin_dirs = self::dir($dir);
+  }
+  
+}
+
 class STL_Template {
   
   private $tpl = array();
@@ -1022,8 +1047,8 @@ class STL_Template {
     return $this->context;
   }
   
-  public function extend($tpl) {
-    array_unshift($this->tpl, file_get_contents($tpl));
+  public function extend($tpl, $file = false) {
+    array_unshift($this->tpl, $file ? file_get_contents($tpl) : $tpl);
     return $this;
   }
   
@@ -1068,6 +1093,14 @@ class STL_Template {
     
     return preg_replace(sprintf($regex_tpl, '\w+'), '$1', $tpl);
     
+  }
+  
+  public static function add_template_dir($dir) {
+    STL_Config::add_template_dir($dir);
+  }
+  
+  public static function add_plugin_dir($dir) {
+    STL_Config::add_plugin_dir($dir);
   }
   
 }
