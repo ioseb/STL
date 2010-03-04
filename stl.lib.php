@@ -635,8 +635,6 @@ class STL_GlobalContext {
 class STL_Context {
   
   private $context   = array();
-  private static $ns = array('env', 'get', 'post');
-  
   public function __construct($context = null) {
     if ($context) {
       if (is_array($context)) {
@@ -682,7 +680,10 @@ class STL_Context {
       $getters = array(
         'get' . $ucfirst,
         'get' . $lcfirst,
-        'is'  . $var
+        'has' . $ucfirst,
+        'has' . $lcfirst,
+        'is'  . $ucfirst,
+        'is'  . $lcfirst
       );
       
       try {
