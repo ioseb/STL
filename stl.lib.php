@@ -894,7 +894,7 @@ class STL_Evaluator {
         }
         
       } else {
-        $result = $ext->init($this->context);
+        $result = $ext->render($this->context);
       }
       
     }
@@ -1226,7 +1226,7 @@ interface STL_IExtensionDataIteratorOutputProcessor
 abstract class STL_AbstractExtension {
   
   private   $attributes         = array();
-  private   $iterator_data      = array();
+  protected $iterator_data      = array();
   protected $allowed_attributes = array();
   
   public function __construct() {}
@@ -1301,7 +1301,9 @@ abstract class STL_AbstractExtension {
   }
   
   public function get_iterator() {
-    if (is_array($this->iterator_data)) {
+    if ($this instanceof STL_IExtensionDataIterator) {
+      return $this;
+    } else if (is_array($this->iterator_data)) {
       return new STL_ArrayIterator($this->iterator_data);
     }
     return null;
@@ -1309,4 +1311,9 @@ abstract class STL_AbstractExtension {
   
   public abstract function init(STL_Context $context);
   
+}
+
+abstract class STL_AbstractTag extends STL_AbstractExtension {
+  public function init(STL_Context $context) {}
+  public abstract function render(STL_Context $context);
 }
