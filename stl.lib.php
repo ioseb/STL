@@ -827,15 +827,16 @@ class STL_Evaluator {
   }
   
   private function eval_ext_each($block) {
-    $result = array();
-    $ext    = self::$extension;
+    $result   = array();
+    $ext      = self::$extension;
+    $iterator = $ext->get_iterator(); 
     
-    if ($ext->is_iterable()) {
+    if ($iterator) {
 
-      while ($ext->has_next()) {
+      while ($iterator->has_next()) {
       
         $context = new STL_Context($this->context);
-        $context->put($block['key'], $ext->next());
+        $context->put($block['key'], $iterator->next());
         $parser   = new STL_Evaluator($context);
         
         if ($ext->preprocesses_iterator_output()) {
@@ -1172,6 +1173,32 @@ class STL_Template {
   
 }
 
+interface STL_IExtensionDataIterator {
+  public function has_next();
+  public function next();
+}
+
+abstract class STL_AbstractExtensionDataIterator implements STL_IExtensionDataIterator {
+  protected $data;
+  
+  public function __construct($data) {
+    $this->data = $data;
+  }
+}
+
+class STL_ArrayIterator extends STL_AbstractExtensionDataIterator {
+  private $current;
+  
+  public function has_next() {
+    return !(($this->current = current($this->data)) === false);  
+  }
+  
+  public function next() {
+    next($this->data);
+    return $this->current;
+  }
+}
+
 interface STL_IExtensionOutputPreProcessor {
   public function preprocess_extension_output($input, STL_Context $context);
 }
@@ -1183,11 +1210,6 @@ interface STL_IExtensionOutputPostProcessor {
 interface STL_IExtensionOutputProcessor 
   extends STL_IExtensionOutputPreProcessor, 
     STL_IExtensionOutputPostProcessor {}
-
-interface STL_IExtensionDataIterator {
-  public function has_next();
-  public function next();
-}
 
 interface STL_IExtensionDataIteratorOutputPreProcessor {
   public function preprocess_iterator_output($input, STL_Context $context);
@@ -1204,6 +1226,7 @@ interface STL_IExtensionDataIteratorOutputProcessor
 abstract class STL_AbstractExtension {
   
   private   $attributes         = array();
+  private   $iterator_data      = array();
   protected $allowed_attributes = array();
   
   public function __construct() {}
@@ -1257,8 +1280,8 @@ abstract class STL_AbstractExtension {
     return $this->attributes;
   }
 
-  public function is_iterable() {
-    return $this instanceof STL_IExtensionDataIterator;
+  public function set_iterator_data($data) {
+    return $this->iterator_data = $data;
   }
   
   public function preprocesses_extension_output() {
@@ -1275,6 +1298,13 @@ abstract class STL_AbstractExtension {
   
   public function postprocesses_iterator_output() {
     return $this instanceof STL_IExtensionDataIteratorOutputPostProcessor;
+  }
+  
+  public function get_iterator() {
+    if (is_array($this->iterator_data)) {
+      return new STL_ArrayIterator($this->iterator_data);
+    }
+    return null;
   }
   
   public abstract function init(STL_Context $context);
