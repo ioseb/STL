@@ -838,16 +838,16 @@ class STL_Evaluator {
         $context->put($block['key'], $ext->next());
         $parser   = new STL_Evaluator($context);
         
-        if ($ext->pre_processes_iterator_output()) {
-          $block['body'] = $ext->pre_process_iterator_output($block['body'], $context);
+        if ($ext->preprocesses_iterator_output()) {
+          $block['body'] = $ext->preprocess_iterator_output($block['body'], $context);
         }
         
         $output = STL_ParseFunction::parse(
           STL_ParseVar::parse($parser->parse($block), $context)
         );
         
-        if ($ext->post_processes_iterator_output()) {
-          $output = $ext->post_process_iterator_output($output, $context);
+        if ($ext->postprocesses_iterator_output()) {
+          $output = $ext->postprocess_iterator_output($output, $context);
         }
         
         $result[] = $output;
@@ -879,8 +879,8 @@ class STL_Evaluator {
         
         self::$extension = $ext;
 
-        if ($ext->pre_processes_extension_output()) {
-          $block['body'] = $ext->pre_process_extension_output($block['body'], $this->context);
+        if ($ext->preprocesses_extension_output()) {
+          $block['body'] = $ext->preprocess_extension_output($block['body'], $this->context);
         }
         
         $parser = new STL_Evaluator($this->context);
@@ -888,8 +888,8 @@ class STL_Evaluator {
           STL_ParseVar::parse($parser->parse($block), $this->context)
         );
         
-        if ($ext->post_processes_extension_output()) {
-          $result = $ext->post_process_extension_output($result, $this->context);
+        if ($ext->postprocesses_extension_output()) {
+          $result = $ext->postprocess_extension_output($result, $this->context);
         }
         
       } else {
@@ -1086,6 +1086,7 @@ class STL_Template {
   
   public function extend($tpl, $file = false) {
     array_unshift($this->tpl, $file ? STL_FileLoader::get_template($tpl) : $tpl);
+    $this->parse_extends();
     return $this;
   }
   
@@ -1102,6 +1103,32 @@ class STL_Template {
     } else {
       $this->tpl[] = STL_FileLoader::get_template($tpl);
     }
+    $this->parse_extends();
+  }
+  
+  private $files = array();
+  
+  private function parse_extends_callback($input) {
+    if (is_array($input)) {
+      $this->files = preg_split('~\s*,\s*~', $input[1]);
+    } else {
+      $this->files = array();
+    }
+    return null;
+  }
+  
+  private function parse_extends() {
+    $this->tpl[0] = preg_replace_callback(
+      '~{extends\s+(.*?)\s*}~', 
+      array($this, 'parse_extends_callback'), 
+      $this->tpl[0]
+    );
+    if (!empty($this->files) && is_array($this->files)) {
+      foreach ($this->files as $file) {
+        $tpl = new STL_Template($file, true);
+        //array_unshift($this->tpl, $tpl->get_extended());
+      }
+    }
   }
   
   private function get_extended() {
@@ -1112,9 +1139,13 @@ class STL_Template {
       {\s*/\s*block\s*}
     ~six';
     
-    if (is_array($this->tpl)) {
+    $this->tpl = array_filter($this->tpl);
+    
+    if (!empty($this->tpl)) {
+    
       $tpl = array_pop($this->tpl);
       rsort($this->tpl);
+      
       foreach ($this->tpl as $data) {
         $regex = sprintf($regex_tpl, '(\w+)');
         if (preg_match_all($regex, $tpl, $matches)) {
@@ -1124,6 +1155,7 @@ class STL_Template {
           $tpl = $data;
         }
       }
+      
     }
     
     return preg_replace(sprintf($regex_tpl, '\w+'), '$1', $tpl);
@@ -1141,11 +1173,11 @@ class STL_Template {
 }
 
 interface STL_IExtensionOutputPreProcessor {
-  public function pre_process_extension_output($input, STL_Context $context);
+  public function preprocess_extension_output($input, STL_Context $context);
 }
 
 interface STL_IExtensionOutputPostProcessor {
-  public function post_process_extension_output($input, STL_Context $context);
+  public function postprocess_extension_output($input, STL_Context $context);
 }
 
 interface STL_IExtensionOutputProcessor 
@@ -1158,11 +1190,11 @@ interface STL_IExtensionDataIterator {
 }
 
 interface STL_IExtensionDataIteratorOutputPreProcessor {
-  public function pre_process_iterator_output($input, STL_Context $context);
+  public function preprocess_iterator_output($input, STL_Context $context);
 }
 
 interface STL_IExtensionDataIteratorOutputPostProcessor {
-  public function post_process_iterator_output($input, STL_Context $context);
+  public function postprocess_iterator_output($input, STL_Context $context);
 }
 
 interface STL_IExtensionDataIteratorOutputProcessor
@@ -1229,19 +1261,19 @@ abstract class STL_AbstractExtension {
     return $this instanceof STL_IExtensionDataIterator;
   }
   
-  public function pre_processes_extension_output() {
+  public function preprocesses_extension_output() {
     return $this instanceof STL_IExtensionOutputPreProcessor;
   }
   
-  public function post_processes_extension_output() {
+  public function postprocesses_extension_output() {
     return $this instanceof STL_IExtensionOutputPostProcessor;
   }
   
-  public function pre_processes_iterator_output() {
+  public function preprocesses_iterator_output() {
     return $this instanceof STL_IExtensionDataIteratorOutputPreProcessor;
   }
   
-  public function post_processes_iterator_output() {
+  public function postprocesses_iterator_output() {
     return $this instanceof STL_IExtensionDataIteratorOutputPostProcessor;
   }
   
